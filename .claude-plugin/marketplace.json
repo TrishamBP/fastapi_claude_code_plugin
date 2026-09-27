@@ -1,0 +1,14 @@
+{
+  "name": "production-fast-api-template",
+  "description": "Engineering standards plugin for the company FastAPI + RAG + Agentic AI backend template.",
+  "owner": {
+    "name": "TrishamBP"
+  },
+  "plugins": [
+    {
+      "name": "production-fast-api-template",
+      "source": "./",
+      "description": "Company standards for a unified FastAPI + RAG + Agentic AI backend on AWS ECS Fargate."
+    }
+  ]
+}
