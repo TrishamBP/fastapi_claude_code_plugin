@@ -300,7 +300,7 @@ sudden shifts in guardrail block rates.
 
 ## 7. Production control baseline
 
-Before launch, a company agent has:
+Before launch, a production agent has:
 
 **Identity and access.** SSO for users and operators; per-agent workload identity; short-lived,
 scoped credentials; tenant and resource authorization in backend services; separate read and

@@ -16,7 +16,7 @@ effectiveness) and `AGENT_SECURITY.md` §8 (adversarial testing).
 - 🟢 **Convention.** A proposed standard. Follow it by default.
 - 🟡 **Needs approval.** An open team decision. Present the options and don't pick one silently.
 - ⚪ **Illustrative.** Example code or configuration. It is not an implemented module, and it doesn't choose a judge model, provider or threshold.
-- **[COMPANY]** A company-proposed metric or check. It is **not** a built-in DeepEval or Ragas feature.
+- **[CUSTOM]** A custom metric or check. It is **not** a built-in DeepEval or Ragas feature.
 
 **Versions these standards were checked against** (details and conflicts in §16):
 
@@ -43,11 +43,11 @@ writing these standards.
 | 6 | Reference-based metrics need **human-authored or human-reviewed** references. LLM-generated references are candidates, never ground truth. | 🟢 |
 | 7 | Scores from DeepEval and Ragas metrics with similar names are **not comparable**. Report them separately, with framework and version. | 🟢 |
 | 8 | Always pass an explicit, approved judge model. Never rely on a framework's default model. | 🟢 (judge 🟡) |
-| 9 | No company-wide pass thresholds without a baseline run and team approval. Thresholds are set per metric, dataset and use case in `evaluation/config/thresholds.yaml`. | 🟢 |
+| 9 | No global pass thresholds without a baseline run and team approval. Thresholds are set per metric, dataset and use case in `evaluation/config/thresholds.yaml`. | 🟢 |
 | 10 | Never average unrelated metrics into one quality score. Keep raw per-sample results. | 🟢 |
 | 11 | Metric definitions, judge prompts, rubrics and judge configuration are **versioned**. Changing any of them starts a new baseline. | 🟢 |
 | 12 | Held-out datasets are never used in prompts, few-shot examples, unit-test fixtures or development tuning. | 🟢 |
-| 13 | No real company documents, PII or credentials in datasets, fixtures or docs. Nothing is sent to an external judge or evaluation platform without authorization. | 🟢 |
+| 13 | No real proprietary documents, PII or credentials in datasets, fixtures or docs. Nothing is sent to an external judge or evaluation platform without authorization. | 🟢 |
 | 14 | Start small: RAG with faithfulness, answer relevancy, contextual precision and contextual recall. Agents with task completion and tool correctness. Add trajectory, conversational and custom metrics as workflows grow. | 🟢 |
 | 15 | Tier 1 (deterministic) runs on every change without LLM calls. Tiers 2 and 3 are opt-in and budgeted (§12). | 🟢 |
 
@@ -417,7 +417,7 @@ class MetricSpec(CustomModel):
     result_kind: Literal["numeric", "binary", "categorical"]
     scale: tuple[float | None, float | None]
     higher_is_better: bool
-    company_defined: bool = False              # True for [COMPANY] metrics
+    custom_defined: bool = False               # True for [CUSTOM] metrics
 ```
 
 ---
@@ -519,7 +519,7 @@ external hosted model (the 4.2.6 docs list `gpt-5.4`).
 
 **Limitations.** "No plan ⇒ score 1" means PlanAdherence/PlanQuality look perfect for agents that
 don't expose a plan: report them as `unavailable/not_applicable` when the trajectory has no
-`plan` step [COMPANY rule]. TaskCompletion judges alignment, not **verified** completion: pair it
+`plan` step [CUSTOM rule]. TaskCompletion judges alignment, not **verified** completion: pair it
 with a deterministic end-state check (§5.3). ArgumentCorrectness is judged, while our argument
 **schema** check is deterministic (§7.1) and runs first.
 
@@ -579,12 +579,12 @@ abstained.add_verdict(verdict=True, score=10)
 abstained.add_verdict(verdict=False, score=0)
 
 def build(judge) -> DAGMetric:
-    return DAGMetric(name="company.abstention", dag=DeepAcyclicGraph(root_nodes=[abstained]), model=judge)
+    return DAGMetric(name="custom.abstention", dag=DeepAcyclicGraph(root_nodes=[abstained]), model=judge)
 ```
 
 **`BaseMetric`** (and `BaseConversationalMetric`): implement `measure`, `async a_measure`,
 `is_successful` and a `__name__` property; set `self.score`, `self.success`, optionally
-`self.reason` and `self.error`. Use it to wrap a deterministic company check when a DeepEval
+`self.reason` and `self.error`. Use it to wrap a deterministic custom check when a DeepEval
 suite needs it inline. The canonical implementation still lives in `evaluation/deterministic/`.
 
 **Judge model.** Subclass `deepeval.models.base_model.DeepEvalBaseLLM` (`load_model`,
@@ -772,13 +772,13 @@ Each stage is evaluated on its **own output**, keyed by stage and K. Stage resul
 | # | Stage (`src/rag/…`) | What to measure | Labels needed | Method |
 |---|---|---|---|---|
 | 1 | Query classification (`router/classifier.py`) | Accuracy, per-class precision/recall/F1, macro-F1, confusion matrix, abstain/fallback rate | Route/department label per query | Deterministic |
-| 2 | Query expansion (`preprocessing/query_expansion.py`) | **Downstream** recall@K delta with vs without expansion, everything else fixed; intent drift | Reference chunk IDs; optional drift rubric | Deterministic ablation; drift via G-Eval / `DiscreteMetric` [COMPANY] |
+| 2 | Query expansion (`preprocessing/query_expansion.py`) | **Downstream** recall@K delta with vs without expansion, everything else fixed; intent drift | Reference chunk IDs; optional drift rubric | Deterministic ablation; drift via G-Eval / `DiscreteMetric` [CUSTOM] |
 | 3 | HyDE (`preprocessing/hyde.py`) | Recall@K / MRR delta vs the plain query; HyDE text never reaches the answer | Reference chunk IDs | Deterministic ablation + leak check |
 | 4 | Semantic retrieval (`retrieval/semantic_search.py`) | Recall@K and Hit@K at candidate depth, MRR, NDCG@K | IDs (graded for NDCG) | Deterministic |
 | 5 | BM25 (`retrieval/bm25.py`) | Same as 4, same K | IDs | Deterministic |
 | 6 | RRF (`retrieval/rrf.py`) | Recall@K vs max(semantic, BM25) at the same K (fusion gain); union coverage | IDs | Deterministic |
 | 7 | Reranking (`llm/reranker.py` via retrieval) | NDCG@k, MRR, P@k at the final k **on the same candidate set** (rerank can't raise recall beyond its input) | Graded relevance | Deterministic |
-| 8 | MMR (`retrieval/mmr.py`) | Recall retained at k vs pre-MMR; redundancy (duplicate documents, near-duplicate chunks) [COMPANY] | IDs; document IDs | Deterministic |
+| 8 | MMR (`retrieval/mmr.py`) | Recall retained at k vs pre-MMR; redundancy (duplicate documents, near-duplicate chunks) [CUSTOM] | IDs; document IDs | Deterministic |
 | 9 | Final context (`generation/context_builder.py`) | P@k, R@k; judged contextual relevancy/precision/recall; context entity recall | IDs + reference answer | Deterministic + DeepEval/Ragas |
 
 **Comparing stages without confusing scores 🟢:**
@@ -832,7 +832,7 @@ then reference-based correctness (`FactualCorrectness`, G-Eval completeness) whe
 | High faithfulness, low answer relevancy | Grounded but off-question (prompt, query understanding) | Classification + expansion drift |
 | Low answer and context relevancy together | Wrong route / department | Routing confusion matrix |
 
-### 4.8 Company rubrics for RAG [COMPANY]
+### 4.8 Custom rubrics for RAG [CUSTOM]
 
 **Enterprise document-grounded answer** (G-Eval or `DomainSpecificRubrics`, version `grounded_answer.v1`):
 
@@ -847,7 +847,7 @@ then reference-based correctness (`FactualCorrectness`, G-Eval completeness) whe
 - *Evidence:* the routing decision, the caller's scope, the label.
 - *Limitations:* labels for ambiguous queries need two annotators and an adjudication rule.
 
-### 4.9 Missing evidence and abstention [COMPANY]
+### 4.9 Missing evidence and abstention [CUSTOM]
 
 Missing-evidence samples (no relevant document exists) expect a refusal or "not found" response.
 Measure deterministically where the response schema has an explicit status (e.g. an
@@ -866,7 +866,7 @@ evidence of completion.
 
 | Level | Question | Methods |
 |---|---|---|
-| Outcome | Was the task completed, verifiably? | Deterministic end-state check against fakes/fixtures [COMPANY]; DeepEval `TaskCompletionMetric`; Ragas `AgentGoalAccuracy` |
+| Outcome | Was the task completed, verifiably? | Deterministic end-state check against fakes/fixtures [CUSTOM]; DeepEval `TaskCompletionMetric`; Ragas `AgentGoalAccuracy` |
 | Trajectory | Right tools, right order, no waste, plan followed? | `ToolCorrectnessMetric`, Ragas `ToolCallAccuracy`/`ToolCallF1`, `StepEfficiencyMetric`, `PlanAdherenceMetric`, `PlanQualityMetric` |
 | Component | Was each tool call correct? | Deterministic argument-schema check (§7.1); `ArgumentCorrectnessMetric`; DeepEval span-level metrics via `@observe(metrics=[...])` |
 
@@ -879,7 +879,7 @@ tool or LLM call) and are useful for isolating a regressing tool. Both are repor
 `TaskCompletionMetric` (or `AgentGoalAccuracy`) + `ToolCorrectnessMetric` (or `ToolCallAccuracy`)
 + the deterministic checks in §5.3. Add step efficiency, plan metrics and custom rubrics later.
 
-### 5.3 Deterministic agent checks (`evaluation/deterministic/tool_calls.py`) [COMPANY]
+### 5.3 Deterministic agent checks (`evaluation/deterministic/tool_calls.py`) [CUSTOM]
 
 - Every tool called exists in the registry and was permitted for the principal (from the trajectory's `denied` statuses and the fixture's permissions).
 - Arguments validate against the tool's argument model.
@@ -897,9 +897,9 @@ tool or LLM call) and are useful for isolating a regressing tool. Both are repor
 | Incomplete execution | Multi-step task where one step fails | End-state check fails; TaskCompletion low even if the reply sounds complete |
 | Repeated actions | Tool that returns a retryable error | Repetition count; loop flag |
 | Plan deviation | Plan step followed by a different action | PlanAdherence low (only if a plan exists) |
-| Hallucinated success | Tool returns an error, agent claims success | End-state check fails; outcome vs final text mismatch [COMPANY] |
+| Hallucinated success | Tool returns an error, agent claims success | End-state check fails; outcome vs final text mismatch [CUSTOM] |
 
-### 5.5 Company rubrics for agents [COMPANY]
+### 5.5 Custom rubrics for agents [CUSTOM]
 
 **Agent task completion** (`task_completion.v1`): *criteria* — every sub-goal in the objective is
 met and verified by a tool result or end state; the final message reports the true status,
@@ -923,14 +923,14 @@ and shared-state snapshots in step content or metadata.
 | Requirement | Method | Native? |
 |---|---|---|
 | Individual agent task completion | Per-agent sub-trajectory → TaskCompletion / AgentGoalAccuracy; deterministic sub-goal end state | Native metric on a split trajectory |
-| Overall workflow completion | End-state check + TaskCompletion on the full trace | Native + [COMPANY] |
+| Overall workflow completion | End-state check + TaskCompletion on the full trace | Native + [CUSTOM] |
 | Tool-call correctness | ToolCorrectness / ToolCallAccuracy per agent; deterministic registry checks | Native + deterministic |
-| Handoff correctness | Expected handoff sequence (from → to, reason category) compared deterministically | [COMPANY] |
-| Shared-state consistency | State snapshots validate against the state model; no agent overwrites a field it doesn't own; final state matches the reference | [COMPANY] deterministic |
-| Repeated or unnecessary work | Same tool + argument hash across agents; duplicate sub-tasks | [COMPANY] deterministic; StepEfficiency on full trace |
-| Failed handoffs | Handoff to unknown agent, handoff loop (A→B→A beyond limit), dropped task | [COMPANY] deterministic |
-| Recovery from tool failures | Injected fake-tool failure; expect bounded retry, fallback or honest failure | [COMPANY] deterministic + G-Eval on the explanation |
-| Human approval checkpoints | Approval-required actions have an `approval` step before them with matching argument hash | [COMPANY] deterministic |
+| Handoff correctness | Expected handoff sequence (from → to, reason category) compared deterministically | [CUSTOM] |
+| Shared-state consistency | State snapshots validate against the state model; no agent overwrites a field it doesn't own; final state matches the reference | [CUSTOM] deterministic |
+| Repeated or unnecessary work | Same tool + argument hash across agents; duplicate sub-tasks | [CUSTOM] deterministic; StepEfficiency on full trace |
+| Failed handoffs | Handoff to unknown agent, handoff loop (A→B→A beyond limit), dropped task | [CUSTOM] deterministic |
+| Recovery from tool failures | Injected fake-tool failure; expect bounded retry, fallback or honest failure | [CUSTOM] deterministic + G-Eval on the explanation |
+| Human approval checkpoints | Approval-required actions have an `approval` step before them with matching argument hash | [CUSTOM] deterministic |
 
 ---
 
@@ -959,7 +959,7 @@ Factual correctness (Ragas `FactualCorrectness`, G-Eval with reference), answer 
 or `DiscreteMetric` with explicit criteria), unsupported claims (faithfulness claim verdicts).
 Only run on outputs that passed §7.1.
 
-### 7.3 Structured output correctness rubric [COMPANY] (`structured_output.v1`)
+### 7.3 Structured output correctness rubric [CUSTOM] (`structured_output.v1`)
 
 *Gates (deterministic):* valid JSON, schema-compliant, valid references. *Judged:* each field's
 value is correct for the input and evidence; free-text fields don't contradict structured fields;
@@ -1210,7 +1210,7 @@ LLM-judged scores are reported as **estimates**, never as objective ground truth
 ## 15. Security considerations
 
 - **Sensitive documents and PII.** Datasets are synthetic or approved, de-identified samples. Production samples need data-owner approval, PII removal and a documented purpose 🟡. Never commit real documents.
-- **Judge data exposure.** Every judged metric sends the input, output and context to the judge. Only approved judge endpoints (e.g. a model in our own cloud account 🟡) may receive company data. **Don't send sensitive company documents to external evaluation providers without authorization.**
+- **Judge data exposure.** Every judged metric sends the input, output and context to the judge. Only approved judge endpoints (e.g. a model in our own cloud account 🟡) may receive sensitive data. **Don't send sensitive documents to external evaluation providers without authorization.**
 - **Framework cloud features are off:** no `deepeval login`, `dataset.push/pull`, `metric.upload()` or Confident AI trace export; no DeepEval `eval_mode="system_one"` (sends data to a third-party model service, `TYPESAFE_API_KEY`) without approval; no Ragas experiment backends that upload data. Framework telemetry is disabled via the frameworks' documented opt-out settings; the exact variable names weren't verified in this phase 🟡.
 - **Env loading.** DeepEval auto-loads `.env.local` and `.env`; set `DEEPEVAL_DISABLE_DOTENV=1` in runners so evaluation doesn't pick up application secrets.
 - **Tool-call traces and tokens.** Normalization drops authorization headers, tokens, API keys and cookies from tool arguments and results before storage; argument hashes replace sensitive values.

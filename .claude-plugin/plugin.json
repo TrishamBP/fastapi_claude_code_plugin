@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "production-fast-api-template",
   "version": "0.1.0",
-  "description": "Company standards for a unified FastAPI + RAG + Agentic AI backend on AWS ECS Fargate: project structure, async execution, Pydantic and structured outputs, API conventions, guardrails, AI evaluation (DeepEval, Ragas), API security and LLM/agent security.",
+  "description": "Production-ready standards for a scalable, unified FastAPI + RAG + Agentic AI backend on AWS ECS Fargate: project structure, async execution, Pydantic and structured outputs, API conventions, guardrails, AI evaluation (DeepEval, Ragas), API security and LLM/agent security.",
   "author": {
     "name": "TrishamBP"
   },
